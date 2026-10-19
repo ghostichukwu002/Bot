@@ -1,0 +1,155 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<meta name="color-scheme" content="dark">
+<title>REVERSE BOT — Pair</title>
+<style>
+  :root { --bg:#0b0d10; --panel:#12151a; --line:#232832; --text:#e7ebf1; --muted:#8a93a3; --accent:#3ddc97; --bad:#ff6b6b; --mono: ui-monospace, Menlo, Consolas, monospace; --sans: system-ui, -apple-system, Segoe UI, Roboto, sans-serif; }
+  * { box-sizing: border-box; }
+  html, body { margin:0; background:var(--bg); color:var(--text); font-family:var(--sans); -webkit-text-size-adjust:100%; }
+  .wrap { max-width: 520px; margin: 0 auto; padding: 24px 16px 48px; }
+  h1 { font-size: 22px; margin: 8px 0 4px; }
+  p.sub { color: var(--muted); margin: 0 0 24px; font-size: 15px; line-height: 1.5; }
+  a { color: var(--accent); }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 18px; margin-bottom: 16px; }
+  label { display:block; font-size: 13px; color: var(--muted); margin: 12px 0 6px; font-family: var(--mono); }
+  label:first-child { margin-top: 0; }
+  input { width: 100%; min-height: 44px; padding: 10px 12px; border-radius: 8px; border: 1px solid var(--line); background: #0a0c0f; color: var(--text); font-family: var(--mono); font-size: 16px; }
+  input:focus { outline: 2px solid var(--accent); outline-offset: 1px; }
+  button { min-height: 44px; width: 100%; margin-top: 14px; padding: 10px 14px; border-radius: 8px; border: 1px solid var(--accent); background: var(--accent); color: var(--bg); font-family: var(--mono); font-weight: 700; font-size: 15px; cursor: pointer; }
+  button.secondary { background: transparent; color: var(--accent); }
+  button.danger { background: transparent; color: var(--bad); border-color: var(--bad); }
+  button:disabled { opacity: .5; cursor: default; }
+  .code { font-family: var(--mono); font-size: 28px; letter-spacing: .12em; text-align: center; padding: 16px; background: #0a0c0f; border: 1px dashed var(--accent); border-radius: 10px; margin-top: 12px; color: var(--accent); user-select: all; }
+  .msg { font-size: 14px; margin-top: 12px; line-height: 1.5; min-height: 1.5em; }
+  .msg.err { color: var(--bad); }
+  .msg.ok { color: var(--accent); }
+  .steps { color: var(--muted); font-size: 14px; line-height: 1.6; padding-left: 18px; margin: 12px 0 0; }
+  .row { display:grid; grid-template-columns: 1fr; gap: 8px; }
+  @media (min-width: 480px) { .row { grid-template-columns: 1fr 1fr; } }
+  pre { font-family: var(--mono); font-size: 13px; background: #0a0c0f; border:1px solid var(--line); padding: 10px; border-radius: 8px; color: var(--text); overflow-x:auto; white-space: pre-wrap; word-break: break-word; margin: 10px 0 0; }
+</style>
+</head>
+<body>
+<main class="wrap">
+  <h1>Pair your bot</h1>
+  <p class="sub">Link your WhatsApp to this server. Your login stays on this server. Nothing is sent to a third party.</p>
+
+  <section class="card">
+    <label for="token">Admin token</label>
+    <input id="token" type="password" autocomplete="off" placeholder="ADMIN_TOKEN from Config.js or your panel">
+
+    <label for="phone">Owner number (digits, with country code)</label>
+    <input id="phone" type="tel" inputmode="numeric" autocomplete="off" placeholder="2347066076505">
+
+    <button id="pair">Get pairing code</button>
+    <div class="code" id="code" hidden></div>
+    <ol class="steps" id="steps" hidden>
+      <li>On your phone, open WhatsApp.</li>
+      <li>Go to Settings → Linked devices → Link a device.</li>
+      <li>Choose "Link with phone number instead" and enter the code above.</li>
+    </ol>
+    <div class="msg" id="msg" role="status" aria-live="polite"></div>
+  </section>
+
+  <section class="card">
+    <div class="row">
+      <button id="status" class="secondary">Check status</button>
+      <button id="logout" class="danger">Log out bot</button>
+    </div>
+    <pre id="status-out" hidden></pre>
+  </section>
+
+  <p class="sub"><a href="/">← Back to REVERSE BOT</a></p>
+</main>
+
+<script>
+  // The token is kept only in this page's memory. It is not saved to the browser.
+  const $ = id => document.getElementById(id);
+  let token = '';
+
+  function setMsg(text, kind) {
+    const el = $('msg');
+    el.textContent = text;
+    el.className = 'msg' + (kind ? ' ' + kind : '');
+  }
+
+  function requireInputs() {
+    token = $('token').value.trim();
+    if (!token) { setMsg('Enter your admin token.', 'err'); return false; }
+    return true;
+  }
+
+  async function api(path, method) {
+    const res = await fetch(path, {
+      method,
+      headers: { 'Authorization': 'Bearer ' + token, 'Content-Type': 'application/json' },
+      body: method === 'POST' && path === '/api/pair' ? JSON.stringify({ phone: $('phone').value.replace(/\D/g, '') }) : undefined,
+    });
+    const data = await res.json().catch(() => ({}));
+    return { ok: res.ok, status: res.status, data };
+  }
+
+  $('pair').addEventListener('click', async () => {
+    if (!requireInputs()) return;
+    const phone = $('phone').value.replace(/\D/g, '');
+    if (!phone) return setMsg('Enter your owner number.', 'err');
+
+    $('pair').disabled = true;
+    setMsg('Requesting code…');
+    try {
+      const r = await api('/api/pair', 'POST');
+      if (r.ok) {
+        $('code').textContent = r.data.code;
+        $('code').hidden = false;
+        $('steps').hidden = false;
+        setMsg('Enter this code in WhatsApp within a minute or two. If it expires, press the button again.', 'ok');
+      } else {
+        setMsg(explain(r), 'err');
+      }
+    } catch (err) {
+      setMsg('Could not reach the server. Check that the bot is running.', 'err');
+    } finally {
+      $('pair').disabled = false;
+    }
+  });
+
+  $('status').addEventListener('click', async () => {
+    try {
+      const res = await fetch('/api/status');
+      const data = await res.json();
+      $('status-out').textContent = JSON.stringify(data, null, 2);
+      $('status-out').hidden = false;
+    } catch (err) {
+      setMsg('Could not reach the server.', 'err');
+    }
+  });
+
+  $('logout').addEventListener('click', async () => {
+    if (!requireInputs()) return;
+    if (!confirm('Log out the bot? You will need to pair again.')) return;
+    $('logout').disabled = true;
+    try {
+      const r = await api('/api/logout', 'POST');
+      setMsg(r.ok ? 'Logged out. Press "Get pairing code" to link again.' : explain(r), r.ok ? 'ok' : 'err');
+    } catch (err) {
+      setMsg('Could not reach the server.', 'err');
+    } finally {
+      $('logout').disabled = false;
+    }
+  });
+
+  function explain(r) {
+    if (r.status === 401) return 'Admin token is wrong.';
+    if (r.status === 403) return 'Only your owner number can be paired.';
+    if (r.status === 429) return 'Too many attempts. Wait 15 minutes and try again.';
+    if (r.status === 503) return 'ADMIN_TOKEN is not set on the server yet.';
+    if (r.status === 409) return r.data.error || 'Could not pair right now.';
+    return r.data.error || 'Something went wrong (' + r.status + ').';
+  }
+</script>
+</body>
+</html>

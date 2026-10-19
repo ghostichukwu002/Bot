@@ -32,7 +32,7 @@
   function render(s) {
     document.getElementById('conn').textContent = s.connection;
     document.getElementById('dot').style.background = colors[s.connection] || 'var(--muted)';
-    document.getElementById('user').textContent = s.user || '–';
+    document.getElementById('user').textContent = s.linked ? 'linked (number hidden)' : 'not linked';
     document.getElementById('mode').textContent = s.mode;
     const m = Math.floor(s.uptimeSeconds / 60);
     document.getElementById('uptime').textContent = m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + (m % 60) + ' min';

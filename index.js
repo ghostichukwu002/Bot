@@ -4,7 +4,7 @@ const crypto = require('crypto');
 const express = require('express');
 const { Server } = require('socket.io');
 const config = require('./Config');
-const { startBot, getStatus, requestPairingCode, logout } = require('./src/bot');
+const { startBot, getStatus, getPublicStatus, requestPairingCode, logout } = require('./src/bot');
 const { listCommands } = require('./src/plugins/loader');
 
 const app = express();
@@ -16,6 +16,28 @@ app.use(express.json());
 // Landing page at /, status dashboard at /dashboard
 app.use(express.static(path.join(__dirname, 'landing')));
 app.use('/dashboard', express.static(path.join(__dirname, 'public')));
+
+// Simple fixed-window rate limiter, per client IP, for admin routes.
+// Limits guessing of the admin token and abuse of pairing requests.
+const WINDOW_MS = 15 * 60 * 1000;
+const MAX_ADMIN_REQUESTS = 10;
+const hits = new Map();
+
+function rateLimit(req, res, next) {
+    const ip = req.ip;
+    const now = Date.now();
+    const entry = hits.get(ip);
+    if (!entry || now - entry.start > WINDOW_MS) {
+        hits.set(ip, { start: now, count: 1 });
+        return next();
+    }
+    entry.count++;
+    if (entry.count > MAX_ADMIN_REQUESTS) {
+        res.set('Retry-After', String(Math.ceil((entry.start + WINDOW_MS - now) / 1000)));
+        return res.status(429).json({ error: 'too many requests, try again later' });
+    }
+    next();
+}
 
 // Admin routes need ADMIN_TOKEN, sent as "Authorization: Bearer <token>".
 // If ADMIN_TOKEN is not set, these routes refuse every request.
@@ -32,10 +54,10 @@ function requireAdmin(req, res, next) {
     next();
 }
 
-// Public endpoints
-app.get('/health', (req, res) => res.json({ ok: true, bot: getStatus() }));
+// Public endpoints. These never include the linked WhatsApp number.
+app.get('/health', (req, res) => res.json({ ok: true, bot: getPublicStatus() }));
 
-app.get('/api/status', (req, res) => res.json(getStatus()));
+app.get('/api/status', (req, res) => res.json(getPublicStatus()));
 
 app.get('/api/commands', (req, res) => {
     res.json(
@@ -52,7 +74,7 @@ app.get('/api/commands', (req, res) => {
 // Admin endpoints
 // Pair the owner's number only. Other numbers are refused, so the server never
 // becomes a public pairing service.
-app.post('/api/pair', requireAdmin, async (req, res) => {
+app.post('/api/pair', rateLimit, requireAdmin, async (req, res) => {
     const phone = String(req.body?.phone || '').replace(/\D/g, '');
     if (!config.OWNER_NUMBER || phone !== config.OWNER_NUMBER) {
         return res.status(403).json({ error: 'Only the owner number can be paired' });
@@ -65,7 +87,7 @@ app.post('/api/pair', requireAdmin, async (req, res) => {
     }
 });
 
-app.post('/api/logout', requireAdmin, async (req, res) => {
+app.post('/api/logout', rateLimit, requireAdmin, async (req, res) => {
     try {
         await logout();
         res.json({ ok: true });
@@ -75,8 +97,8 @@ app.post('/api/logout', requireAdmin, async (req, res) => {
 });
 
 // Push status changes to the dashboard
-io.on('connection', socket => socket.emit('status', getStatus()));
-const emitStatus = () => io.emit('status', getStatus());
+io.on('connection', socket => socket.emit('status', getPublicStatus()));
+const emitStatus = () => io.emit('status', getPublicStatus());
 
 // Error handler
 app.use((err, req, res, next) => {

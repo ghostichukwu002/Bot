@@ -46,7 +46,9 @@ The server runs the bot and an HTTP API on `PORT`.
 | `POST /api/pair` | admin | Get a pairing code. Body: `{"phone":"<OWNER_NUMBER>"}`. Only the owner number is accepted. |
 | `POST /api/logout` | admin | Log out of WhatsApp and delete local credentials, then start again for a new pairing |
 
-Admin routes need `Authorization: Bearer <ADMIN_TOKEN>`. If `ADMIN_TOKEN` is not set, they return 503.
+Admin routes need `Authorization: Bearer <ADMIN_TOKEN>`. If `ADMIN_TOKEN` is not set, they return 503. Each client IP gets 10 admin requests per 15 minutes; extra requests return 429.
+
+Public routes never include the linked WhatsApp number. They only report connection state, whether the bot is linked, uptime, and mode.
 
 ```bash
 curl -X POST http://localhost:3000/api/pair \

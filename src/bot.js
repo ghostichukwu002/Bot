@@ -21,16 +21,29 @@ const state = {
 
 let sock = null;
 let onStatus = () => {};
+// Each connect() gets a generation number. Event handlers from older sockets
+// check it and do nothing, so stale sockets cannot start duplicate reconnects.
+let generation = 0;
+let reconnectTimer = null;
 
 function setConnection(value) {
     state.connection = value;
     onStatus(getStatus());
 }
 
+// Full status, including the linked account. Use only for admin responses and logs.
 function getStatus() {
     return {
-        connection: state.connection,
+        ...getPublicStatus(),
         user: state.user,
+    };
+}
+
+// Status safe to show publicly. It omits the linked WhatsApp number.
+function getPublicStatus() {
+    return {
+        connection: state.connection,
+        linked: !!state.user,
         uptimeSeconds: Math.floor((Date.now() - state.startedAt) / 1000),
         mode: config.MODE,
     };
@@ -95,25 +108,31 @@ async function handleMessage(msg) {
 }
 
 async function connect() {
+    const myGen = ++generation;
     const { state: authState, saveCreds } = await useMultiFileAuthState(config.AUTH_DIR);
     const { version } = await fetchLatestBaileysVersion();
 
-    sock = makeWASocket({
+    // A newer connect() started while we were waiting. Let it win.
+    if (myGen !== generation) return;
+
+    const thisSock = makeWASocket({
         version,
         auth: authState,
         logger,
         printQRInTerminal: false,
         browser: ['Kord-Clone', 'Chrome', '1.0.0'],
     });
+    sock = thisSock;
 
-    sock.ev.on('creds.update', saveCreds);
+    thisSock.ev.on('creds.update', saveCreds);
 
     // Pair with a number code when configured and this device is not yet registered
-    if (config.PAIRING_NUMBER && !sock.authState.creds.registered) {
+    if (config.PAIRING_NUMBER && !thisSock.authState.creds.registered) {
         setConnection('pairing');
         setTimeout(async () => {
+            if (myGen !== generation) return;
             try {
-                const code = await sock.requestPairingCode(config.PAIRING_NUMBER);
+                const code = await thisSock.requestPairingCode(config.PAIRING_NUMBER);
                 console.log(`Pairing code: ${code.match(/.{1,4}/g).join('-')}`);
                 console.log('WhatsApp > Linked devices > Link with phone number, then enter this code.');
             } catch (err) {
@@ -122,7 +141,8 @@ async function connect() {
         }, 3000);
     }
 
-    sock.ev.on('connection.update', update => {
+    thisSock.ev.on('connection.update', update => {
+        if (myGen !== generation) return;
         const { connection, lastDisconnect, qr } = update;
 
         if (qr && !config.PAIRING_NUMBER) {
@@ -132,7 +152,7 @@ async function connect() {
         }
 
         if (connection === 'open') {
-            state.user = jidNormalizedUser(sock.user.id);
+            state.user = jidNormalizedUser(thisSock.user.id);
             console.log(`Connected as ${state.user}`);
             setConnection('open');
         }
@@ -140,18 +160,20 @@ async function connect() {
         if (connection === 'close') {
             const code = lastDisconnect?.error?.output?.statusCode;
             const loggedOut = code === DisconnectReason.loggedOut;
+            state.user = null;
             setConnection('closed');
             if (loggedOut) {
-                console.error('Logged out from WhatsApp. Delete the auth folder and pair again.');
+                console.error('Logged out from WhatsApp. Log out via the admin API or delete the auth folder, then pair again.');
                 return;
             }
             console.log('Connection closed, reconnecting in 5s...');
-            setTimeout(() => connect().catch(err => console.error(err)), 5000);
+            clearTimeout(reconnectTimer);
+            reconnectTimer = setTimeout(() => connect().catch(err => console.error(err)), 5000);
         }
     });
 
-    sock.ev.on('messages.upsert', ({ messages, type }) => {
-        if (type !== 'notify') return;
+    thisSock.ev.on('messages.upsert', ({ messages, type }) => {
+        if (myGen !== generation || type !== 'notify') return;
         for (const msg of messages) {
             handleMessage(msg).catch(err => logger.error(err));
         }
@@ -174,15 +196,24 @@ async function requestPairingCode(phone) {
 // Log out of WhatsApp, delete local credentials and start again so a new pairing can be made.
 async function logout() {
     if (!sock) throw new Error('Bot is not running yet');
+
+    // Stop the current socket and any pending reconnect before touching credentials.
+    // Bumping the generation makes the old socket's handlers ignore its own close event.
+    clearTimeout(reconnectTimer);
+    generation++;
+    const old = sock;
+    sock = null;
     try {
-        await sock.logout();
+        await old.logout();
     } catch (err) {
         logger.error(err);
+        try { old.end(undefined); } catch (_) { /* already closed */ }
     }
+
     fs.rmSync(config.AUTH_DIR, { recursive: true, force: true });
     state.user = null;
     setConnection('starting');
     setTimeout(() => connect().catch(err => console.error(err)), 1000);
 }
 
-module.exports = { startBot, getStatus, requestPairingCode, logout };
+module.exports = { startBot, getStatus, getPublicStatus, requestPairingCode, logout };

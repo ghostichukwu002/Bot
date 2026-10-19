@@ -15,6 +15,10 @@ module.exports = {
     // Folder where Baileys stores login credentials between restarts
     AUTH_DIR: process.env.AUTH_DIR || 'auth_info',
 
+    // Secret for the admin API (/api/pair, /api/logout). Required to use those routes.
+    // Use a long random value, e.g. `openssl rand -hex 32`.
+    ADMIN_TOKEN: process.env.ADMIN_TOKEN || '',
+
     // Phone number (digits only) to pair with a code instead of scanning a QR.
     // Leave empty to use QR.
     PAIRING_NUMBER: process.env.PAIRING_NUMBER || '',

@@ -126,7 +126,7 @@
   <div class="wrap hero">
     <div class="eyebrow">WhatsApp bot framework</div>
     <h1>Your bot.<br>Your rules.</h1>
-    <div class="status"><span class="dot"></span> REVERSE BOT online <span class="badge">ENCRYPTED</span></div>
+    <div class="status"><span class="dot" id="status-dot"></span> <span id="status-text">REVERSE BOT</span> <span class="badge">ENCRYPTED</span></div>
     <p class="lede">REVERSE BOT runs your WhatsApp like a machine room: pair a number, deploy the bot anywhere, and drive every module from one prefix.</p>
     <div class="cta-row">
       <a class="btn" href="#setup">Start setup</a>
@@ -137,7 +137,7 @@
       <div class="row"><span class="me">you ›</span> .ping</div>
       <div class="row"><span class="bot">Pong! Up for 3h on vps-01.</span></div>
       <div class="row"><span class="me">you ›</span> .menu</div>
-      <div class="row"><span class="bot">Commands: ping · menu · echo · groupinfo · tagall · kick</span></div>
+      <div class="row"><span class="bot" id="cmd-list">Commands: ping · menu · echo · groupinfo · tagall · kick</span></div>
       <div class="row muted">// more modules load from plugins</div>
     </div>
   </div>
@@ -215,6 +215,39 @@ PAIRING_NUMBER=2348012345678 npm start</pre>
     </nav>
   </div>
 </footer>
+
+<script>
+  // Pull live status and commands from the backend. If the server is not
+  // reachable, the static text stays in place.
+  (async function () {
+    try {
+      const [status, commands] = await Promise.all([
+        fetch('/api/status').then(r => r.json()),
+        fetch('/api/commands').then(r => r.json()),
+      ]);
+
+      const dot = document.getElementById('status-dot');
+      const text = document.getElementById('status-text');
+      const labels = {
+        open: 'online',
+        qr: 'waiting for QR scan',
+        pairing: 'waiting for pairing code',
+        closed: 'offline, reconnecting',
+        starting: 'starting',
+      };
+      text.textContent = 'REVERSE BOT ' + (labels[status.connection] || status.connection);
+      dot.style.background = status.connection === 'open' ? 'var(--accent)' : 'var(--muted)';
+      dot.style.boxShadow = 'none';
+
+      const names = commands.filter(c => !c.ownerOnly).map(c => '.' + c.name);
+      if (names.length) {
+        document.getElementById('cmd-list').textContent = 'Commands: ' + names.join(' · ');
+      }
+    } catch (err) {
+      // Backend not reachable. Keep the static content.
+    }
+  })();
+</script>
 
 </body>
 </html>

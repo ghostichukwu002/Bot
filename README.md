@@ -32,6 +32,33 @@ The dashboard runs at http://localhost:3000 and `/health` returns JSON for uptim
 
 Keep `auth_info/` private. Anyone with it can act as your WhatsApp account.
 
+## Web backend
+
+The server runs the bot and an HTTP API on `PORT`.
+
+| Route | Auth | Purpose |
+| --- | --- | --- |
+| `GET /` | none | Landing page |
+| `GET /dashboard` | none | Live status dashboard |
+| `GET /health` | none | Uptime check |
+| `GET /api/status` | none | Connection state and uptime |
+| `GET /api/commands` | none | Public command list |
+| `POST /api/pair` | admin | Get a pairing code. Body: `{"phone":"<OWNER_NUMBER>"}`. Only the owner number is accepted. |
+| `POST /api/logout` | admin | Log out of WhatsApp and delete local credentials, then start again for a new pairing |
+
+Admin routes need `Authorization: Bearer <ADMIN_TOKEN>`. If `ADMIN_TOKEN` is not set, they return 503.
+
+```bash
+curl -X POST http://localhost:3000/api/pair \
+  -H "Authorization: Bearer $ADMIN_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"phone":"2348012345678"}'
+```
+
+The pairing code appears in the response. Enter it on your phone under WhatsApp → Linked devices → Link with phone number.
+
+The API pairs only the owner's number. It does not create sessions for other people, so it cannot be used as a public pairing service.
+
 ## Commands
 
 | Command | Who | Description |

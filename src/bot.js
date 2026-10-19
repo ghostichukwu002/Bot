@@ -5,6 +5,7 @@ const {
     fetchLatestBaileysVersion,
     jidNormalizedUser,
 } = require('@whiskeysockets/baileys');
+const fs = require('fs');
 const pino = require('pino');
 const qrcode = require('qrcode-terminal');
 const config = require('../Config');
@@ -163,4 +164,25 @@ async function startBot({ onStatusChange } = {}) {
     await connect();
 }
 
-module.exports = { startBot, getStatus };
+// Ask WhatsApp for a pairing code for this device. Used by the admin API.
+async function requestPairingCode(phone) {
+    if (!sock) throw new Error('Bot is not running yet');
+    if (sock.authState.creds.registered) throw new Error('Already paired. Log out first to pair again.');
+    return sock.requestPairingCode(phone);
+}
+
+// Log out of WhatsApp, delete local credentials and start again so a new pairing can be made.
+async function logout() {
+    if (!sock) throw new Error('Bot is not running yet');
+    try {
+        await sock.logout();
+    } catch (err) {
+        logger.error(err);
+    }
+    fs.rmSync(config.AUTH_DIR, { recursive: true, force: true });
+    state.user = null;
+    setConnection('starting');
+    setTimeout(() => connect().catch(err => console.error(err)), 1000);
+}
+
+module.exports = { startBot, getStatus, requestPairingCode, logout };

@@ -6,6 +6,9 @@ module.exports = {
     OWNER_NUMBER: process.env.OWNER_NUMBER || '',
     OWNER_NAME: process.env.OWNER_NAME || 'Owner',
 
+    // Name shown in the confirmation message sent to the owner when the bot connects
+    BOT_NAME: process.env.BOT_NAME || 'REVERSE BOT',
+
     // Command prefixes. Any of these starts a command, e.g. ".menu" or "/menu"
     PREFIX: (process.env.PREFIX || '.,/').split(',').map(p => p.trim()).filter(Boolean),
 

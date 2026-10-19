@@ -155,6 +155,7 @@ async function connect() {
             state.user = jidNormalizedUser(thisSock.user.id);
             console.log(`Connected as ${state.user}`);
             setConnection('open');
+            notifyOwnerOnce(thisSock);
         }
 
         if (connection === 'close') {
@@ -184,6 +185,20 @@ async function startBot({ onStatusChange } = {}) {
     if (onStatusChange) onStatus = onStatusChange;
     loadPlugins();
     await connect();
+}
+
+// Send the owner a confirmation message once per process start, when the bot connects.
+let ownerNotified = false;
+async function notifyOwnerOnce(socket) {
+    if (ownerNotified || !config.OWNER_NUMBER) return;
+    ownerNotified = true;
+    try {
+        await socket.sendMessage(`${config.OWNER_NUMBER}@s.whatsapp.net`, {
+            text: `${config.BOT_NAME} is connected and ready. Send ${config.PREFIX[0]}menu to see commands.`,
+        });
+    } catch (err) {
+        logger.error(err);
+    }
 }
 
 // Ask WhatsApp for a pairing code for this device. Used by the admin API.

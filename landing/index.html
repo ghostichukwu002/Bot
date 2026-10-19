@@ -1,0 +1,183 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>REVERSE BOT — Your bot. Your rules.</title>
+<meta name="description" content="REVERSE BOT is a multi-function WhatsApp bot framework. Pair, deploy, chat.">
+<style>
+  :root {
+    --bg: #0b0d10;
+    --panel: #12151a;
+    --line: #232832;
+    --text: #e7ebf1;
+    --muted: #8a93a3;
+    --accent: #3ddc97;
+    --accent-2: #7aa7ff;
+    --mono: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    --sans: system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html, body { margin: 0; background: var(--bg); color: var(--text); font-family: var(--sans); }
+  a { color: inherit; text-decoration: none; }
+  .wrap { max-width: 1080px; margin: 0 auto; padding: 0 20px; }
+
+  header { position: sticky; top: 0; z-index: 10; background: rgba(11,13,16,.85); backdrop-filter: blur(8px); border-bottom: 1px solid var(--line); }
+  header .wrap { display: flex; align-items: center; justify-content: space-between; height: 60px; }
+  .logo { font-family: var(--mono); font-weight: 700; letter-spacing: .08em; }
+  .logo span { color: var(--accent); }
+  nav { display: flex; gap: 22px; align-items: center; font-family: var(--mono); font-size: 14px; color: var(--muted); }
+  nav a:hover { color: var(--text); }
+  .btn { display: inline-block; padding: 10px 16px; border-radius: 8px; font-family: var(--mono); font-size: 14px; border: 1px solid var(--accent); color: var(--bg); background: var(--accent); font-weight: 600; }
+  .btn.ghost { background: transparent; color: var(--accent); }
+
+  .hero { padding: 80px 0 56px; }
+  .eyebrow { font-family: var(--mono); font-size: 13px; color: var(--accent); letter-spacing: .14em; text-transform: uppercase; }
+  h1 { font-size: clamp(40px, 7vw, 72px); line-height: 1.02; margin: 14px 0 18px; letter-spacing: -.02em; }
+  .lede { font-size: 18px; color: var(--muted); max-width: 620px; line-height: 1.6; margin: 0 0 28px; }
+  .cta-row { display: flex; gap: 12px; flex-wrap: wrap; }
+  .status { display: inline-flex; align-items: center; gap: 8px; font-family: var(--mono); font-size: 13px; color: var(--muted); margin-bottom: 24px; }
+  .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--accent); box-shadow: 0 0 0 4px rgba(61,220,151,.15); }
+  .badge { font-family: var(--mono); font-size: 11px; border: 1px solid var(--line); padding: 2px 8px; border-radius: 999px; color: var(--muted); }
+
+  .chat { margin-top: 48px; background: var(--panel); border: 1px solid var(--line); border-radius: 14px; padding: 18px; font-family: var(--mono); font-size: 14px; max-width: 620px; }
+  .chat .row { margin: 10px 0; }
+  .chat .me { color: var(--accent-2); }
+  .chat .bot { color: var(--text); background: #1a1f27; border-radius: 8px; padding: 10px 12px; display: inline-block; }
+  .chat .muted { color: var(--muted); }
+
+  section { padding: 56px 0; border-top: 1px solid var(--line); }
+  .section-title { font-family: var(--mono); font-size: 13px; color: var(--accent); letter-spacing: .14em; text-transform: uppercase; margin: 0 0 8px; }
+  h2 { font-size: 30px; margin: 0 0 28px; letter-spacing: -.01em; }
+
+  .steps { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 16px; }
+  .card { background: var(--panel); border: 1px solid var(--line); border-radius: 12px; padding: 20px; }
+  .card .num { font-family: var(--mono); color: var(--accent); font-size: 13px; }
+  .card h3 { margin: 10px 0 8px; font-size: 18px; }
+  .card p { color: var(--muted); margin: 0 0 14px; line-height: 1.55; font-size: 15px; }
+  pre { margin: 0; background: #0a0c0f; border: 1px solid var(--line); border-radius: 8px; padding: 12px; font-family: var(--mono); font-size: 13px; color: var(--text); overflow-x: auto; }
+
+  .modules { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; }
+  .module h3 { font-family: var(--mono); font-size: 15px; margin: 0 0 8px; color: var(--accent-2); }
+  .module p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.55; }
+
+  footer { border-top: 1px solid var(--line); padding: 28px 0 40px; color: var(--muted); font-family: var(--mono); font-size: 13px; }
+  footer .wrap { display: flex; justify-content: space-between; flex-wrap: wrap; gap: 14px; }
+  footer nav { gap: 16px; }
+
+  @media (max-width: 640px) {
+    nav a.hide-sm { display: none; }
+    .hero { padding: 56px 0 40px; }
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="wrap">
+    <a class="logo" href="/">REVERSE<span>.BOT</span></a>
+    <nav>
+      <a class="hide-sm" href="#setup">Setup</a>
+      <a class="hide-sm" href="#modules">Modules</a>
+      <a href="https://github.com/ghostichukwu002/Bot">Repo</a>
+      <a class="btn" href="#setup">Get started</a>
+    </nav>
+  </div>
+</header>
+
+<main>
+  <div class="wrap hero">
+    <div class="eyebrow">WhatsApp bot framework</div>
+    <h1>Your bot.<br>Your rules.</h1>
+    <div class="status"><span class="dot"></span> REVERSE BOT online <span class="badge">ENCRYPTED</span></div>
+    <p class="lede">REVERSE BOT runs your WhatsApp like a machine room: pair a number, deploy the bot anywhere, and drive every module from one prefix.</p>
+    <div class="cta-row">
+      <a class="btn" href="#setup">Start setup</a>
+      <a class="btn ghost" href="https://github.com/ghostichukwu002/Bot">View source →</a>
+    </div>
+
+    <div class="chat" aria-label="Example chat">
+      <div class="row"><span class="me">you ›</span> .ping</div>
+      <div class="row"><span class="bot">Pong! Up for 3h on vps-01.</span></div>
+      <div class="row"><span class="me">you ›</span> .menu</div>
+      <div class="row"><span class="bot">Commands: ping · menu · echo · groupinfo · tagall · kick</span></div>
+      <div class="row muted">// more modules load from plugins</div>
+    </div>
+  </div>
+
+  <section id="setup">
+    <div class="wrap">
+      <div class="section-title">Setup</div>
+      <h2>Zero to bot in three moves.</h2>
+      <div class="steps">
+        <div class="card">
+          <div class="num">01</div>
+          <h3>Pair your number</h3>
+          <p>Start a session, then link your WhatsApp with a pairing code or QR. Keep the credentials private.</p>
+          <pre>npm install
+OWNER_NUMBER=2348012345678 \
+PAIRING_NUMBER=2348012345678 npm start</pre>
+        </div>
+        <div class="card">
+          <div class="num">02</div>
+          <h3>Deploy the bot</h3>
+          <p>Run it on a VPS, a process manager, or any host that keeps a Node process alive.</p>
+          <pre>npx pm2 start index.js --name reverse-bot</pre>
+        </div>
+        <div class="card">
+          <div class="num">03</div>
+          <h3>Chat with it</h3>
+          <p>Send a command from any chat you're in. The bot answers on the same number you paired.</p>
+          <pre>.ping
+.menu</pre>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <section id="modules">
+    <div class="wrap">
+      <div class="section-title">Modules</div>
+      <h2>One prefix. Full rack.</h2>
+      <div class="modules">
+        <div class="card module">
+          <h3>[core]</h3>
+          <p>ping, menu, echo, owner info, and an owner-only restart command.</p>
+        </div>
+        <div class="card module">
+          <h3>[groups]</h3>
+          <p>Group info, mention-all, and admin tools such as removing members.</p>
+        </div>
+        <div class="card module">
+          <h3>[plugins]</h3>
+          <p>Drop a file into the plugins folder and it loads on the next start. Each plugin exports its commands.</p>
+        </div>
+        <div class="card module">
+          <h3>[media] <span style="color:var(--muted)">soon</span></h3>
+          <p>Downloads, stickers, and image tools are planned as plugins on the same loader.</p>
+        </div>
+        <div class="card module">
+          <h3>[status]</h3>
+          <p>A live dashboard and a <code>/health</code> endpoint for uptime checks.</p>
+        </div>
+        <div class="card module">
+          <h3>[access]</h3>
+          <p>Public or private mode. Owner-only and group-only checks on each command.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<footer>
+  <div class="wrap">
+    <div>© 2026 REVERSE BOT</div>
+    <nav>
+      <a href="https://github.com/ghostichukwu002/Bot">repo</a>
+      <a href="https://github.com/ghostichukwu002/Bot/blob/main/README.md">docs</a>
+    </nav>
+  </div>
+</footer>
+
+</body>
+</html>

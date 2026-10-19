@@ -23,5 +23,6 @@ module.exports = {
     // Leave empty to use QR.
     PAIRING_NUMBER: process.env.PAIRING_NUMBER || '',
 
-    PORT: parseInt(process.env.PORT, 10) || 3000,
+    // Pterodactyl sets SERVER_PORT for the port assigned to the server. PORT is used elsewhere.
+    PORT: parseInt(process.env.PORT || process.env.SERVER_PORT, 10) || 3000,
 };

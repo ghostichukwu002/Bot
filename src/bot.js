@@ -1,0 +1,166 @@
+const {
+    default: makeWASocket,
+    useMultiFileAuthState,
+    DisconnectReason,
+    fetchLatestBaileysVersion,
+    jidNormalizedUser,
+} = require('@whiskeysockets/baileys');
+const pino = require('pino');
+const qrcode = require('qrcode-terminal');
+const config = require('../Config');
+const { loadPlugins, findCommand } = require('./plugins/loader');
+
+const logger = pino({ level: process.env.LOG_LEVEL || 'silent' });
+
+const state = {
+    connection: 'starting', // starting | qr | pairing | open | closed
+    user: null,
+    startedAt: Date.now(),
+};
+
+let sock = null;
+let onStatus = () => {};
+
+function setConnection(value) {
+    state.connection = value;
+    onStatus(getStatus());
+}
+
+function getStatus() {
+    return {
+        connection: state.connection,
+        user: state.user,
+        uptimeSeconds: Math.floor((Date.now() - state.startedAt) / 1000),
+        mode: config.MODE,
+    };
+}
+
+function isOwner(jid) {
+    const number = jidNormalizedUser(jid).split('@')[0];
+    return config.OWNER_NUMBER && number === config.OWNER_NUMBER;
+}
+
+// Build a helper object passed to every plugin so they don't touch Baileys directly
+function makeContext(msg) {
+    const from = msg.key.remoteJid;
+    const sender = msg.key.participant || from;
+    const text =
+        msg.message?.conversation ||
+        msg.message?.extendedTextMessage?.text ||
+        msg.message?.imageMessage?.caption ||
+        msg.message?.videoMessage?.caption ||
+        '';
+
+    return {
+        sock,
+        msg,
+        from,
+        sender,
+        isGroup: from.endsWith('@g.us'),
+        isOwner: isOwner(sender) || msg.key.fromMe,
+        text,
+        reply: content => sock.sendMessage(from, { text: content }, { quoted: msg }),
+        react: emoji => sock.sendMessage(from, { react: { text: emoji, key: msg.key } }),
+    };
+}
+
+async function handleMessage(msg) {
+    if (!msg.message || msg.key.remoteJid === 'status@broadcast') return;
+
+    const ctx = makeContext(msg);
+    if (!ctx.text) return;
+
+    const prefix = config.PREFIX.find(p => ctx.text.startsWith(p));
+    if (!prefix) return;
+
+    const [name, ...args] = ctx.text.slice(prefix.length).trim().split(/\s+/);
+    const command = findCommand(name?.toLowerCase());
+    if (!command) return;
+
+    if (config.MODE === 'private' && !ctx.isOwner) return;
+    if (command.ownerOnly && !ctx.isOwner) {
+        return ctx.reply('This command is for the bot owner only.');
+    }
+    if (command.groupOnly && !ctx.isGroup) {
+        return ctx.reply('This command only works in groups.');
+    }
+
+    try {
+        await command.run({ ...ctx, args, command: name.toLowerCase() });
+    } catch (err) {
+        logger.error(err);
+        await ctx.reply(`Error running ${name}: ${err.message}`);
+    }
+}
+
+async function connect() {
+    const { state: authState, saveCreds } = await useMultiFileAuthState(config.AUTH_DIR);
+    const { version } = await fetchLatestBaileysVersion();
+
+    sock = makeWASocket({
+        version,
+        auth: authState,
+        logger,
+        printQRInTerminal: false,
+        browser: ['Kord-Clone', 'Chrome', '1.0.0'],
+    });
+
+    sock.ev.on('creds.update', saveCreds);
+
+    // Pair with a number code when configured and this device is not yet registered
+    if (config.PAIRING_NUMBER && !sock.authState.creds.registered) {
+        setConnection('pairing');
+        setTimeout(async () => {
+            try {
+                const code = await sock.requestPairingCode(config.PAIRING_NUMBER);
+                console.log(`Pairing code: ${code.match(/.{1,4}/g).join('-')}`);
+                console.log('WhatsApp > Linked devices > Link with phone number, then enter this code.');
+            } catch (err) {
+                console.error('Could not request pairing code:', err.message);
+            }
+        }, 3000);
+    }
+
+    sock.ev.on('connection.update', update => {
+        const { connection, lastDisconnect, qr } = update;
+
+        if (qr && !config.PAIRING_NUMBER) {
+            setConnection('qr');
+            console.log('Scan this QR code from WhatsApp > Linked devices:');
+            qrcode.generate(qr, { small: true });
+        }
+
+        if (connection === 'open') {
+            state.user = jidNormalizedUser(sock.user.id);
+            console.log(`Connected as ${state.user}`);
+            setConnection('open');
+        }
+
+        if (connection === 'close') {
+            const code = lastDisconnect?.error?.output?.statusCode;
+            const loggedOut = code === DisconnectReason.loggedOut;
+            setConnection('closed');
+            if (loggedOut) {
+                console.error('Logged out from WhatsApp. Delete the auth folder and pair again.');
+                return;
+            }
+            console.log('Connection closed, reconnecting in 5s...');
+            setTimeout(() => connect().catch(err => console.error(err)), 5000);
+        }
+    });
+
+    sock.ev.on('messages.upsert', ({ messages, type }) => {
+        if (type !== 'notify') return;
+        for (const msg of messages) {
+            handleMessage(msg).catch(err => logger.error(err));
+        }
+    });
+}
+
+async function startBot({ onStatusChange } = {}) {
+    if (onStatusChange) onStatus = onStatusChange;
+    loadPlugins();
+    await connect();
+}
+
+module.exports = { startBot, getStatus };

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Kord-Ai Clone</title>
+<style>
+  :root { color-scheme: light dark; --bg:#f6f7f9; --card:#fff; --text:#1d2330; --muted:#6b7280; --ok:#16a34a; --warn:#d97706; --bad:#dc2626; }
+  @media (prefers-color-scheme: dark) { :root { --bg:#0f1115; --card:#181b22; --text:#e6e8ee; --muted:#9aa3b2; } }
+  body { margin:0; font-family: system-ui, sans-serif; background:var(--bg); color:var(--text); display:grid; place-items:center; min-height:100vh; padding:16px; box-sizing:border-box; }
+  .card { background:var(--card); padding:24px; border-radius:12px; width:min(420px,100%); box-shadow:0 1px 3px rgba(0,0,0,.08); }
+  h1 { font-size:1.2rem; margin:0 0 16px; }
+  dl { display:grid; grid-template-columns:auto 1fr; gap:8px 16px; margin:0; }
+  dt { color:var(--muted); }
+  dd { margin:0; word-break:break-all; }
+  .dot { display:inline-block; width:10px; height:10px; border-radius:50%; margin-right:6px; background:var(--muted); }
+</style>
+</head>
+<body>
+<main class="card">
+  <h1>Kord-Ai Clone</h1>
+  <dl>
+    <dt>Connection</dt><dd><span class="dot" id="dot"></span><span id="conn">connecting…</span></dd>
+    <dt>Account</dt><dd id="user">–</dd>
+    <dt>Uptime</dt><dd id="uptime">–</dd>
+    <dt>Mode</dt><dd id="mode">–</dd>
+  </dl>
+</main>
+<script src="/socket.io/socket.io.js"></script>
+<script>
+  const colors = { open:'var(--ok)', qr:'var(--warn)', pairing:'var(--warn)', closed:'var(--bad)', starting:'var(--muted)' };
+  function render(s) {
+    document.getElementById('conn').textContent = s.connection;
+    document.getElementById('dot').style.background = colors[s.connection] || 'var(--muted)';
+    document.getElementById('user').textContent = s.user || '–';
+    document.getElementById('mode').textContent = s.mode;
+    const m = Math.floor(s.uptimeSeconds / 60);
+    document.getElementById('uptime').textContent = m < 60 ? m + ' min' : Math.floor(m / 60) + ' h ' + (m % 60) + ' min';
+  }
+  const socket = io();
+  socket.on('status', render);
+</script>
+</body>
+</html>
